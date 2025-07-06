@@ -1,0 +1,308 @@
+---
+title: "Business Statistics Mid-Term Assessment IB94X0 2024-2025 #1"
+author: '5646570'
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+---
+
+```{r setup, message=FALSE}
+# Load the required libraries
+library(tidyverse)
+library(knitr)
+options(width=100)
+
+# Loading the dataset from the CSV file
+York_Footfall_data <- read_csv("York_Footfall_data.csv")
+
+# Viewing the first few rows to check if it's loaded correctly
+head(York_Footfall_data)
+#For viewing structure of the data 
+glimpse(York_Footfall_data)
+# Ensuring the Date column is in Date format
+footfall_data <- York_Footfall_data %>%
+  mutate(Date = as.Date(Date))
+
+```
+
+---
+---
+
+# Loading the data and checking it for integrity/quality. 
+
+```{r}
+#Checking for missing values
+York_Footfall_data %>%
+  summarise(across(everything(), ~sum(is.na(.)), .names = "missing_{col}"))
+sum(is.na(York_Footfall_data))
+
+#Checking for duplicate rows
+sum(duplicated(York_Footfall_data))
+
+#Creating a boxplot to identify outliers in our dataset
+ggplot(York_Footfall_data, aes(x = LocationName, y = TotalCount)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 16, outlier.size = 2) +
+  labs(title = "Boxplot of Daily York_Footfall_Data by Location", 
+       x = "Location Name", 
+       y = "Daily Footfall") +
+  theme_minimal()
+
+#Imputing missing values in TotalCount using median because it is less affected by extreme values or outliers, offering a more resilient measure of central tendency when data shows variability or skewness.
+median_value <- median(York_Footfall_data$TotalCount, na.rm = TRUE)  #Calculating median while ignoring NA
+
+York_Footfall_data$TotalCount[is.na(York_Footfall_data$TotalCount)] <- median_value # Imputing missing values with median
+
+#Verifying that there are no missing values in TotalCount
+missing_count_after <- sum(is.na(York_Footfall_data$TotalCount))  
+
+# Checking again for missing values
+cat("Missing values in TotalCount after imputation:", missing_count_after, "\n")
+```
+
+# Providing a summary table that shows the following for each location where footfall was measured: 
+```{r}
+#Creating a Summary Table
+summary_table <- York_Footfall_data %>%
+  group_by(LocationName) %>%
+  summarise(first_day = min(Date), # Measuring footfall for first day
+  last_day = max(Date), # Measuring footfall for last day
+  mean_daily_footfall = mean(TotalCount, na.rm = TRUE),  # Mean for daily footfall
+  sd_daily_footfall = sd(TotalCount, na.rm = TRUE), # Standard deviation of daily footfall
+  max_daily_footfall = max(TotalCount, na.rm = TRUE), # Highest daily footfall
+  min_daily_footfall = min(TotalCount, na.rm = TRUE) # Lowest daily footfall
+  )
+
+# Printing the summary table
+summary_table
+
+# Visualising data quality by performing boxplot
+ggplot(York_Footfall_data, aes(x = LocationName, y = TotalCount)) +
+  geom_boxplot(outlier.color = "brown", outlier.shape = 16, outlier.size = 2) +
+  labs(title = "Footfall Distribution by Location", x = "Location", y = "Footfall")
+```
+
+```{r}
+# Filtering data for the year 2019
+York_footfall_2019 <- York_Footfall_data %>%
+  filter(lubridate::year(Date) == 2019)
+
+#Checking if the filtered data is now present:
+glimpse(York_footfall_2019)
+
+# Histogram to show the frequency distribution of daily footfall across locations, with consistent scales, allowing for visual comparison of footfall patterns across locations.
+png("histogram_footfall_2019.png", width = 800, height = 600) #saving image for later reference in summary report
+ggplot(York_footfall_2019, aes(x = TotalCount, fill = LocationName)) +
+  geom_histogram(binwidth = 100, alpha = 0.7) +
+  facet_wrap(~ LocationName) +
+  labs(title = "Distribution of Daily Footfall Across Locations (2019)",
+       x = "Daily Footfall Count",
+       y = "Frequency",
+       fill = "Location") +
+  theme_minimal()
+dev.off() # finalize the file
+knitr::include_graphics("histogram_footfall_2019.png")
+
+# Boxplot to compare footfall distributions across locations
+#This helps in identifying if certain locations consistently have higher footfall or have more variability compared to others.
+png("boxplot_footfall_2019.png", width = 800, height = 600) #saving image for later reference in summary report
+ggplot(York_footfall_2019, aes(x = LocationName, y = TotalCount, fill = LocationName)) +
+  geom_boxplot(outlier.color = "pink", outlier.shape = 16, outlier.size = 2) +
+  labs(title = "Boxplot of Daily Footfall Across Locations (2019)",
+       x = "Location",
+       y = "Daily Footfall Count") +
+  theme_minimal() +
+  theme(legend.position = "none")
+dev.off() # finalize the file
+knitr::include_graphics("boxplot_footfall_2019.png")
+
+# Density plot to show the distribution of footfall across locations, providing a smooth curve that shows how daily footfall is spread.
+ggplot(York_footfall_2019, aes(x = TotalCount, color = LocationName)) +
+  geom_density() +
+  labs(title = "Density Plot of Daily Footfall Across Locations (2019)",
+       x = "Daily Footfall Count",
+       y = "Density") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+```
+```{r}
+#Performing a t-test to compare the footfall on Coney Street to Stonegate. 
+# Filtering for Coney Street and Stonegate
+York_footfall_coney_stonegate <- York_footfall_2019 %>%
+  filter(LocationName %in% c("Coney Street", "Stonegate"))
+
+# Performing the t-test comparing footfall between Coney Street and Stonegate
+result_for_t_test <- t.test(TotalCount ~ LocationName, data = York_footfall_coney_stonegate)
+
+# View the result of the t-test
+result_for_t_test
+#There was a statistically significant difference in mean foot traffic between Coney Street and Stonegate, according to the t-test, which produced a t-statistic of 3.36 with 699 degrees of freedom and a p-value of 0.00082.
+
+```
+```{r}
+if (result_for_t_test$p.value < 0.05) {
+    cat("The t-test indicates a significant difference in footfall between Coney Street and Stonegate during weekdays, suggesting that stall placement on Coney Street may lead to higher engagement.")
+}
+
+```
+
+
+```{r}
+#Performing an additional t-test to compare the footfall on Coney Street to Stonegate only on weekends (i.e. Saturdays/Sundays).
+
+# Filtering for Coney Street, Stonegate, and weekends (Saturdays and Sundays)
+York_weekend_footfall <- York_footfall_2019 %>%
+  filter(LocationName %in% c("Coney Street", "Stonegate") & 
+         WeekDay %in% c("Saturday", "Sunday"))
+
+#Now, we can perform the t-test for footfall on weekends between Coney Street and Stonegate.
+# Performing the t-test comparing weekend footfall between Coney Street and Stonegate
+result_t_test_weekend <- t.test(TotalCount ~ LocationName, data = York_weekend_footfall)
+
+# View the result of the weekend t-test
+result_t_test_weekend
+```
+
+<b>Recommendations for Stall Placement Based on Footfall Analysis</b>
+
+Based on the results of the statistical analysis and t-tests comparing footfall at Coney Street and Stonegate, the following recommendations are made to enhance passerby engagement:
+
+<b>1. Weekday Stall Placement:</b>
+#According to statistical findings, there is <b>substantial evidence to reject the null hypothesis if the p-value is less than 0.05</b>, which would show that there is a significant difference in footfall between the two locations.
+
+<b>*Coney Street*</b> is the optimal location for setting up the stall during *weekdays*. The analysis indicates a statistically significant higher footfall in this area compared to Stonegate, maximizing visibility and increasing the likelihood of customer engagement. <b>This suggests that businesses looking to maximize visibility and engagement should prioritize stall placements on Coney Street during weekdays</b>.
+
+
+<b>2. Weekend Stall Placement:</b>
+<b>*For weekend placements*</b>, <b>*either Coney Street or Stonegate*</b> would be viable options, as there is no significant difference in footfall between the two locations. <b>*However, if the stall is positioned on Coney Street during the weekdays, it may be advantageous to move it to Stonegate over the weekend*</b>. This strategy would create a balanced customer engagement opportunity across both areas.
+
+Additional logistical considerations, such as access, available space, and the demographics of the target audience, should also be factored into the final decision-making process.
+
+
+#Limitations
+The analysis is based on footfall data collected in 2019, which may not reflect current trends due to changes in local infrastructure or events. Additionally, footfall might be influenced by seasonal variations and special events not accounted for in this dataset.
+
+
+
+
+
+
+---
+# Section 2
+
+#A structured summary table for quick reference.
+```{r}
+
+# Loading necessary libraries
+library(knitr)
+library(dplyr)
+
+# Creating a summary table for weekday and weekend footfall
+# Load necessary libraries
+library(knitr)
+
+# Create a summary table with t-test results for weekdays and weekends
+summary_table <- data.frame(
+  Location = c("Coney Street", "Stonegate"),
+  Weekday_Mean = c(20817.45, 19204.09),
+  Weekend_Mean = c(25863.37, 26166.96)
+  
+  
+  
+)
+
+# Display the summary table
+kable(summary_table, caption = "Summary of Footfall Statistics for Coney Street and Stonegate", 
+      col.names = c("Location", "Mean Footfall (Weekdays)", "Mean Footfall (Weekends)"))
+
+```
+<b>Report Summary</b>: Footfall Analysis for Optimal Stall Placement
+This analysis reviews pedestrian footfall data across York's main locations, pinpointing Coney Street as ideal for weekday stalls and either Coney Street or Stonegate for weekend placements to maximize engagement. The data includes daily footfall counts from 2019, allowing us to analyse broad trends and peak pedestrian times.
+
+A statistical analysis was carried out to compare footfall trends between these two venues on weekdays and weekends.
+
+```{r}
+knitr::include_graphics("histogram_footfall_2019.png")
+```
+
+<b>Description for the histogram</b>
+
+This histogram displays the distribution of daily footfall across locations in 2019. Higher peaks at Coney Street suggest higher foot traffic compared to other locations.
+
+
+```{r}
+knitr::include_graphics("boxplot_footfall_2019.png")
+```
+
+<b>This boxplot</b> compares the daily footfall distributions across locations. Coney Street shows a consistently higher median footfall on weekdays, indicating its suitability for weekday stall placement
+
+<b>*Key findings:*</b> 
+<b>*Weekday Footfall Comparison*</b>: According to statistical studies, <b>*Coney Street*</b> has much higher average weekday footfall (20,817.45) than Stonegate. This study indicates that establishing a stand on Coney Street throughout the week would likely result in higher pedestrian exposure than on Stonegate.
+
+<b>*Weekend Footfall Comparison*</b>: On weekends, the footfall averages on Coney Street (25,863.37) and Stonegate (26,166.96) are statistically comparable, with no significant difference. As a result, either location might be picked during weekends, as both are expected to have equivalent foot traffic levels.
+
+```{r}
+# Loading necessary libraries
+library(ggplot2)
+library(dplyr)
+
+# Preparinging the data for bar plot
+# Calculating means and standard errors for footfall counts
+#The code calculates the mean and standard error (SE) of the footfall counts for each location. This helps in visualizing the average while accounting for variability.
+summary_data <- York_footfall_coney_stonegate %>%
+  group_by(LocationName) %>%
+  summarise(
+    Mean_Footfall = mean(TotalCount),
+    SE = sd(TotalCount) / sqrt(n())
+  )
+
+# Creating a bar plot with error bars
+#The geom_bar() function creates bars representing the average footfall for Coney Street and Stonegate, while geom_errorbar() adds error bars to show the uncertainty around the mean estimates.
+ggplot(summary_data, aes(x = LocationName, y = Mean_Footfall, fill = LocationName)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +
+  geom_errorbar(aes(ymin = Mean_Footfall - SE, ymax = Mean_Footfall + SE), 
+                width = 0.2, position = position_dodge(0.7)) +
+  labs(title = "Average Footfall Comparison: Coney Street vs. Stonegate",
+       x = "Location",
+       y = "Average Daily Footfall Count",
+       fill = "Location") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
+
+<b>*Recommendations:*</b>
+By presenting the average footfall counts with error bars in this manner, we can understand the footfall patterns and can further make discussion on how to optimize operations, marketing efforts, or crowd management strategies based on observed footfall trends.
+
+<b>*Weekday Placement:*</b> Given Coney Street's higher weekday footfall, this location is recommended for maximum engagement with passing people.
+
+<b>*Weekend Placement:*</b> For weekend days, either Coney Street or Stonegate would be appropriate for stall placement, allowing for additional logistical considerations such as space and accessibility.
+
+
+<b> *These recommendations are based on robust data comparisons and provide an opportunity to strategically maximise footfall engagement for promotional initiatives.* </b>
+
+
+
+
+Declaration of use of AI:
+AI used: ChatGPT
+
+<b>*Why AI was used*</b>: ChatGPT was employed to ensure code functionality, enhance the quality of data presentation, and support the effective use of R Markdown for visualizations.
+
+<b>*What AI was used for*:</b>
+1. To debug and rectify errors within the code while validating the quality and integrity of the dataset.
+2. To learn methods for embedding images in R Markdown files, including the syntax for saving plots with ggsave() and png() and using include_graphics() for final report presentation.
+3. To explore plotting techniques (histogram, boxplot, and density plot) for representing footfall distribution across locations, including understanding which plot types are most appropriate for various aspects of the data.
+4. To gain insights into possible visualization approaches in R to ensure the results are presented clearly and professionally.
+
+<b>*Which AI was used:*</b> ChatGPT by OpenAI.
+
+<b>*Use of generated content in submission:*</b> *No content generated by AI has been directly* included in this submission. The AI tool was utilized purely for guidance and learning purposes in code implementation, visualization decisions, and presentation techniques.
+
+
