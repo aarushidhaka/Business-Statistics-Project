@@ -29,4 +29,4 @@ The project covers:
 ## 📂 Cloning the Repository
 To clone this repository, run:
 ```bash
-git clone https://github.com/yourusername/Business-Statistics-Consumer-Health-Analysis.git
+git clone https://github.com/aarushidhaka/Business-Statistics-Project-1
